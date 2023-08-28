@@ -20,11 +20,24 @@ describe('Crowdsale', () => {
     accounts = await ethers.getSigners()
     deployer = accounts[0]
     user1 = accounts[1]
+    user2 = accounts[2]
 
     crowdsale = await Crowdsale.deploy(token.address, ether(1), '1000000')
 
+    await crowdsale.connect(deployer).addAddress(user1.address)
+
     let transaction = await token.connect(deployer).transfer(crowdsale.address, tokens(1000000))
     await transaction.wait()
+
+    // Delay by 1 day
+    await hre.network.provider.request({
+      method: "evm_increaseTime",
+      params: [86400]
+    })
+    await hre.network.provider.request({
+      method: "evm_mine",
+      params: []
+    })
   })
 
   describe('Deployment', () => {
@@ -77,6 +90,17 @@ describe('Crowdsale', () => {
         await expect(crowdsale.connect(user1).buyTokens(tokens(10), { value: 0 })).to.be.reverted
       })
 
+      it('rejects addresses not on the allow list', async () => {
+        await expect(crowdsale.connect(user2).buyTokens(tokens(10), { value: 10 })).to.be.reverted
+      })
+
+      it('rejects purchases under minimum amount', async () => {
+        await expect(crowdsale.connect(user1).buyTokens(tokens(5), { value: 0 })).to.be.reverted
+      })
+
+      it('rejects purchases over max amount', async () => {
+        await expect(crowdsale.connect(user1).buyTokens(tokens(11000), { value: 0 })).to.be.reverted
+      })
     })
 
   })
